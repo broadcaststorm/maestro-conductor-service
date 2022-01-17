@@ -24,7 +24,5 @@
 **/values.dev.yaml
 README.md
 **/.github
-service-local.sh
-python-setup.sh
+**/scripts
 **/data
-local_storage.json
