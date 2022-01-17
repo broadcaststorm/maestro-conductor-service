@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-TODO: Deduplicate validators following https://pydantic-docs.helpmanual.io/usage/validators/#reuse-validators
+TODO:
 
 """
 
 
 from pydantic import BaseModel
-from pydantic import ValidationError, validator
+from pydantic import validator
 import validators
 
 
@@ -42,7 +42,7 @@ class ProjectInput(Project):
             "example": {
                 "name": "vxlan-evpn-core",
                 "title": "VXLAN EVPN Multisite Core Technologies",
-                "description": "An environment to demonstrate foundational VXLAN EVPN Multisite Core technologies."
+                "description": "An environment to demonstrate foundational VXLAN EVPN Multisite Core technologies." # noqa
             }
         }
 
@@ -69,7 +69,7 @@ class ScenarioInput(Scenario):
             "example": {
                 "name": "vpc-bgw-as-dci",
                 "title": "VXLAN EVPN Multisite Core Technologies",
-                "description": "An environment to demonstrate foundational VXLAN EVPN Multisite Core technologies.",
+                "description": "An environment to demonstrate foundational VXLAN EVPN Multisite Core technologies.", # noqa
                 "project": "vxlan-evpn-core"
             }
         }

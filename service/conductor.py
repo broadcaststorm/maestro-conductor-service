@@ -4,7 +4,7 @@ TODO: Reduce class duplication via https://fastapi.tiangolo.com/tutorial/extra-m
 
 """
 
-from typing import Optional, List
+from typing import List
 from fastapi import FastAPI, HTTPException
 
 from service.storage import StorageService, StorageException

@@ -9,7 +9,7 @@ from service.models import ScenarioCore, ScenarioInput, Scenario
 
 
 class StorageException(Exception):
-    def __init__(self, status_code=500, status_message='Undefined'):
+    def __init__(self, status_code=500, status_message="Undefined"):
         Exception.__init__(self)
         self.status_code = status_code
         self.status_message = status_message
@@ -35,7 +35,7 @@ class ScenarioNameNotFound(StorageException):
 
 class StorageService:
     # For PoC, let's start with local storage
-    def __init__(self, pathname='data', filename='local_storage.json'):
+    def __init__(self, pathname="data", filename="local_storage.json"):
         self.data = {
             "project": {},
             "scenario": {}
@@ -45,7 +45,6 @@ class StorageService:
         self.storage_file = filename
         self.storage_name = f'{pathname}/{filename}'
 
-
     # Data handling routines
     def _get_project(self, name, core=False):
         if name not in self.data["project"]:
@@ -54,31 +53,28 @@ class StorageService:
         if core:
             project = ProjectCore(
                 name=name,
-                title=self.data["project"][name]['title']
+                title=self.data["project"][name]["title"]
             )
         else:
             project = Project(
                 name=name,
-                title=self.data["project"][name]['title'],
-                description = self.data["project"][name]['description']
+                title=self.data["project"][name]["title"],
+                description=self.data["project"][name]["description"]
             )
 
         return project
 
-
     def _set_project(self, name, title, description):
         self.data["project"][name] = {
-            'title': title,
-            'description': description
+            "title": title,
+            "description": description
         }
 
         # Fetch the project data, in schema format
         return self._get_project(name)
 
-
     def _get_project_list(self) -> List[str]:
         return list(self.data["project"])
-
 
     def _get_scenario(self, name, core=False):
         if name not in self.data["scenario"]:
@@ -87,49 +83,44 @@ class StorageService:
         if core:
             scenario = ScenarioCore(
                 name=name,
-                title=self.data["scenario"][name]['title'],
-                project=self.data["scenario"][name]['project']
+                title=self.data["scenario"][name]["title"],
+                project=self.data["scenario"][name]["project"]
             )
         else:
             scenario = Scenario(
                 name=name,
-                title=self.data["scenario"][name]['title'],
-                project=self.data["scenario"][name]['project'],
-                description = self.data["scenario"][name]['description']
+                title=self.data["scenario"][name]["title"],
+                project=self.data["scenario"][name]["project"],
+                description=self.data["scenario"][name]["description"]
             )
 
         return scenario
 
-
     def _set_scenario(self, name, title, description, project):
         self.data["scenario"][name] = {
-            'title': title,
-            'description': description,
-            'project': project
+            "title": title,
+            "description": description,
+            "project": project
         }
 
         # Fetch the scenario data, in schema format
         return self._get_scenario(name)
 
-
     def _get_scenario_list(self) -> List[str]:
         return list(self.data["scenario"])
 
-
     def save_data(self):
         # json the data and save to file
-        with open(self.storage_name, 'w') as outfile:
+        with open(self.storage_name, "w") as outfile:
             json.dump(self.data, outfile)
-
 
     def load_data(self):
         # Load the data file if there.  Otherwise, start clean.
         try:
-            with open(self.storage_name, 'r') as infile:
+            with open(self.storage_name, "r") as infile:
                 self.data = json.load(infile)
-        except:
+        except Exception:
             pass
-
 
     # Web service related calls
     def create_project(self, project: ProjectInput):
@@ -167,7 +158,7 @@ class StorageService:
             # No error handling here as we want to pass them all back
             project: Project = self._get_project(name)
             return project
-        
+
         # Longer part - list of summaries
         project_list: List[str] = self._get_project_list()
 
@@ -221,7 +212,7 @@ class StorageService:
             # No error handling here as we want to pass them all back
             scenario: Scenario = self._get_scenario(name)
             return scenario
-        
+
         # Longer part - list of summaries
         scenario_list: List[str] = self._get_scenario_list()
 
