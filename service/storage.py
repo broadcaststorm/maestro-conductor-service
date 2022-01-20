@@ -36,7 +36,11 @@ class ScenarioNameNotFound(StorageException):
 
 
 class Storage:
-    pass
+    def save_data(self):
+        pass
+
+    def load_data(self):
+        pass
 
 
 class LocalStorage(Storage):
@@ -179,7 +183,7 @@ class etcdStorage(Storage):
         results = self.storage_service.get_prefix('/project/')
 
         projects = [
-            d["key"]
+            d["key"].decode("utf-8").split('/')[-1]
             for v, d in results
         ]
 
@@ -225,7 +229,7 @@ class etcdStorage(Storage):
         results = self.storage_service.get_prefix('/scenario/')
 
         scenarios = [
-            d["key"]
+            d["key"].decode("utf-8").split('/')[-1]
             for v, d in results
         ]
 
@@ -255,6 +259,8 @@ class StorageService:
         result_project = self._svc.set_project(
             project.name, project.title, project.description
         )
+
+        self._svc.save_data()
 
         return result_project
 
@@ -308,7 +314,7 @@ class StorageService:
             scenario.project
         )
 
-        self.save_data()
+        self._svc.save_data()
 
         return result_scenario
 

@@ -22,7 +22,7 @@ def application():
 
     api = FastAPI()
     storage_service = StorageService()
-    app_version = Version(version='0.1.1')
+    app_version = Version(version='0.2.0')
 
     return api
 
