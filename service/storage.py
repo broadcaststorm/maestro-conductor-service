@@ -143,7 +143,7 @@ class etcdStorage(Storage):
 
     # Data handling routines
     def get_project(self, name, core=False):
-        value = self.storage.get(f'/project/{name}')
+        value = self.storage_service.get(f'/project/{name}')
 
         if not value:
             raise ProjectNameNotFound(name)
@@ -186,7 +186,7 @@ class etcdStorage(Storage):
         return projects
 
     def get_scenario(self, name, core=False):
-        value = self.storage.get(f'/scenario/{name}')
+        value = self.storage_service.get(f'/scenario/{name}')
 
         if not value:
             raise ScenarioNameNotFound(name)
