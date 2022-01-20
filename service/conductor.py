@@ -22,8 +22,6 @@ def application():
 
     api = FastAPI()
     storage_service = StorageService()
-    storage_service.load_data()
-
     app_version = Version(version='0.1.0')
 
     return api

@@ -1,3 +1,6 @@
 fastapi ~= 0.71.0
+pydantic ~= 1.9.0
 uvicorn ~= 0.17.0
 validators ~= 0.18.2
+etcd3gw ~= 1.0.0
+flake8 ~= 4.0.1

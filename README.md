@@ -21,9 +21,9 @@ spec and docs (OpenAPI-UI and Redocly versions).
 - [Python Requests request class attribute: data vs json](https://stackoverflow.com/questions/26615756/python-requests-module-sends-json-string-instead-of-x-www-form-urlencoded-param)
 - [Dockerfile reference](https://docs.docker.com/engine/reference/builder/)
 - [etcd 3.5 docs](https://etcd.io/docs/v3.5/)
+- [etcd3-gateway](https://docs.openstack.org/etcd3gw/latest/), [OpenDev Repo](https://opendev.org/openstack/etcd3gw)
 - [Rancher Desktop Mac Networking Issue](https://github.com/rancher-sandbox/rancher-desktop/issues/1141)
 
 ## Roadmap Items
 
-- Convert storage to [etcd](https://etcd.io) storage service.
 - Authentication

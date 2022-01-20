@@ -4,6 +4,8 @@
 import json
 from typing import List
 
+from etcd3gw.client import Etcd3Client
+
 from service.models import Project, ProjectInput, ProjectCore
 from service.models import ScenarioCore, ScenarioInput, Scenario
 
@@ -33,8 +35,11 @@ class ScenarioNameNotFound(StorageException):
         self.scenario_name = scenario_name
 
 
-class StorageService:
-    # For PoC, let's start with local storage
+class Storage:
+    pass
+
+
+class LocalStorage(Storage):
     def __init__(self, pathname="data", filename="local_storage.json"):
         self.data = {
             "project": {},
@@ -45,8 +50,10 @@ class StorageService:
         self.storage_file = filename
         self.storage_name = f'{pathname}/{filename}'
 
+        self.load_data()
+
     # Data handling routines
-    def _get_project(self, name, core=False):
+    def get_project(self, name, core=False):
         if name not in self.data["project"]:
             raise ProjectNameNotFound(name)
 
@@ -64,19 +71,19 @@ class StorageService:
 
         return project
 
-    def _set_project(self, name, title, description):
+    def set_project(self, name, title, description):
         self.data["project"][name] = {
             "title": title,
             "description": description
         }
 
         # Fetch the project data, in schema format
-        return self._get_project(name)
+        return self.get_project(name)
 
-    def _get_project_list(self) -> List[str]:
+    def get_project_list(self) -> List[str]:
         return list(self.data["project"])
 
-    def _get_scenario(self, name, core=False):
+    def get_scenario(self, name, core=False):
         if name not in self.data["scenario"]:
             raise ScenarioNameNotFound(name)
 
@@ -96,7 +103,7 @@ class StorageService:
 
         return scenario
 
-    def _set_scenario(self, name, title, description, project):
+    def set_scenario(self, name, title, description, project):
         self.data["scenario"][name] = {
             "title": title,
             "description": description,
@@ -104,9 +111,9 @@ class StorageService:
         }
 
         # Fetch the scenario data, in schema format
-        return self._get_scenario(name)
+        return self.get_scenario(name)
 
-    def _get_scenario_list(self) -> List[str]:
+    def get_scenario_list(self) -> List[str]:
         return list(self.data["scenario"])
 
     def save_data(self):
@@ -122,11 +129,118 @@ class StorageService:
         except Exception:
             pass
 
+
+class etcdStorage(Storage):
+    def __init__(
+        self,
+        etcd_service='maestro-etcd.maestro.svc.cluster.local',
+        etcd_port=2379
+    ):
+
+        self.storage_service = Etcd3Client(
+            host=etcd_service, port=etcd_port, api_path='/v3/'
+        )
+
+    # Data handling routines
+    def get_project(self, name, core=False):
+        value = self.storage.get(f'/project/{name}')
+
+        if not value:
+            raise ProjectNameNotFound(name)
+
+        data = json.loads(value[0])
+
+        if core:
+            project = ProjectCore(name=name, title=data["title"])
+        else:
+            project = Project(
+                name=name, title=data["title"], description=data["description"]
+            )
+
+        return project
+
+    def set_project(self, name, title, description):
+        """
+        Convert Python dictionary to string and store as value
+        """
+
+        data = {'title': title, 'description': description}
+
+        self.storage_service.put(
+            key=f'/project/{name}',
+            value=json.dumps(data)
+        )
+
+        # Fetch the project data, in schema format
+        return self.get_project(name)
+
+    def get_project_list(self) -> List[str]:
+        # Return list of (value, key metadata)
+        results = self.storage_service.get_prefix('/project/')
+
+        projects = [
+            d["key"]
+            for v, d in results
+        ]
+
+        return projects
+
+    def get_scenario(self, name, core=False):
+        value = self.storage.get(f'/scenario/{name}')
+
+        if not value:
+            raise ScenarioNameNotFound(name)
+
+        data = json.loads(value[0])
+
+        if core:
+            scenario = ScenarioCore(
+                name=name, title=data["title"], project=data["project"]
+            )
+        else:
+            scenario = Scenario(
+                name=name, title=data["title"], project=data["project"],
+                description=data["description"]
+            )
+
+        return scenario
+
+    def set_scenario(self, name, title, description, project):
+        data = {
+            "title": title,
+            "description": description,
+            "project": project
+        }
+
+        self.storage_service.put(
+            key=f'/scenario/{name}',
+            value=json.dumps(data)
+        )
+
+        # Fetch the scenario data, in schema format
+        return self.get_scenario(name)
+
+    def get_scenario_list(self) -> List[str]:
+        # Return list of (value, key metadata)
+        results = self.storage_service.get_prefix('/scenario/')
+
+        scenarios = [
+            d["key"]
+            for v, d in results
+        ]
+
+        return scenarios
+
+
+class StorageService:
+    def __init__(self, svc=etcdStorage()):
+        self._svc = svc
+
     # Web service related calls
     def create_project(self, project: ProjectInput):
 
         try:
-            self._get_project(project.name)
+            self._svc.get_project(project.name)
         except ProjectNameNotFound:
             # This is okay for creating a project
             pass
@@ -138,11 +252,9 @@ class StorageService:
             )
 
         # Project data, in Project schema format
-        result_project = self._set_project(
+        result_project = self._svc.set_project(
             project.name, project.title, project.description
         )
-
-        self.save_data()
 
         return result_project
 
@@ -156,16 +268,16 @@ class StorageService:
         # Easy part - specific project request
         if name:
             # No error handling here as we want to pass them all back
-            project: Project = self._get_project(name)
+            project: Project = self._svc.get_project(name)
             return project
 
         # Longer part - list of summaries
-        project_list: List[str] = self._get_project_list()
+        project_list: List[str] = self._svc.get_project_list()
 
         return_projects: List[ProjectCore] = []
         for project in project_list:
             return_projects.append(
-                self._get_project(project, core=True)
+                self._svc.get_project(project, core=True)
             )
 
         return return_projects
@@ -174,7 +286,7 @@ class StorageService:
 
         # Are we creating a duplicate?
         try:
-            self._get_scenario(scenario.name)
+            self._svc.get_scenario(scenario.name)
         except ScenarioNameNotFound:
             # This is okay for creating a scenario
             pass
@@ -189,7 +301,7 @@ class StorageService:
         self.fetch_project(scenario.project)
 
         # scenario data, in scenario schema format
-        result_scenario = self._set_scenario(
+        result_scenario = self._svc.set_scenario(
             scenario.name,
             scenario.title,
             scenario.description,
@@ -210,16 +322,16 @@ class StorageService:
         # Easy part - specific scenario request
         if name:
             # No error handling here as we want to pass them all back
-            scenario: Scenario = self._get_scenario(name)
+            scenario: Scenario = self._svc.get_scenario(name)
             return scenario
 
         # Longer part - list of summaries
-        scenario_list: List[str] = self._get_scenario_list()
+        scenario_list: List[str] = self._svc.get_scenario_list()
 
         return_scenarios: List[ScenarioCore] = []
         for scenario in scenario_list:
             return_scenarios.append(
-                self._get_scenario(scenario, core=True)
+                self._svc.get_scenario(scenario, core=True)
             )
 
         return return_scenarios
