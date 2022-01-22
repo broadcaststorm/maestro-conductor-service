@@ -134,10 +134,10 @@ class LocalStorage(Storage):
             pass
 
 
-class etcdStorage(Storage):
+class EtcdStorage(Storage):
     def __init__(
         self,
-        etcd_service='maestro-etcd.maestro.svc.cluster.local',
+        etcd_service="localhost",
         etcd_port=2379
     ):
 
@@ -237,7 +237,7 @@ class etcdStorage(Storage):
 
 
 class StorageService:
-    def __init__(self, svc=etcdStorage()):
+    def __init__(self, svc=EtcdStorage()):
         self._svc = svc
 
     # Web service related calls
