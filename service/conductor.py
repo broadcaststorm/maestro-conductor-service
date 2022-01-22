@@ -12,6 +12,7 @@ from service.storage import StorageService, StorageException
 from service.models import Version
 from service.models import ProjectCore, ProjectInput, Project
 from service.models import ScenarioCore, ScenarioInput, Scenario
+from service.models import ReservationCore, ReservationInput, Reservation
 
 
 # Entry point for gunicorn (Dockerfile)
@@ -134,3 +135,51 @@ def get_scenario(name: str):
         raise HTTPException(status_code=400, detail='Generic failure')
 
     return scenario
+
+
+@api.post('/reserve/project/', response_model=Reservation)
+def create_reservation(reservation: ReservationInput):
+    try:
+        result: Reservation = storage_service.create_reservation(reservation)
+    except StorageException as err:
+        raise HTTPException(
+            status_code=err.status_code,
+            detail=err.status_message
+        )
+    except Exception as err:
+        print(err)
+        raise HTTPException(status_code=400, detail='Generic failure')
+
+    return result
+
+
+@api.get('/reserve/project/', response_model=List[ReservationCore])
+def get_all_reservations():
+    try:
+        summaries: List[ReservationCore] = storage_service.fetch_reservation()
+    except StorageException as err:
+        raise HTTPException(
+            status_code=err.status_code,
+            detail=err.status_message
+        )
+    except Exception as err:
+        print(err)
+        raise HTTPException(status_code=400, detail='Generic failure')
+
+    return summaries
+
+
+@api.get('/reserve/project/{project}', response_model=Reservation)
+def get_reservation(name: str):
+    try:
+        reservation: Reservation = storage_service.fetch_reservation(name)
+    except StorageException as err:
+        raise HTTPException(
+            status_code=err.status_code,
+            detail=err.status_message
+        )
+    except Exception as err:
+        print(err)
+        raise HTTPException(status_code=400, detail='Generic failure')
+
+    return reservation

@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-"""
-TODO:
-
-"""
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from pydantic import validator
 import validators
 
@@ -73,3 +69,29 @@ class ScenarioInput(Scenario):
                 "project": "vxlan-evpn-core"
             }
         }
+
+
+class LeaseRequest(BaseModel):
+    ttl: int
+
+
+class Lease(LeaseRequest):
+    id: int
+
+
+class ReservationCore(BaseModel):
+    project: str
+    email: EmailStr
+
+
+class Reservation(ReservationCore, Lease):
+    pass
+
+
+class ReservationInput(ReservationCore):
+    # Email validation is "for free" with EmailStr
+
+    # Project name needs to be valid path in URL (valid project validated later)
+    _project_is_valid_url = validator('project', allow_reuse=True)(valid_url_path)
+
+    duration: int

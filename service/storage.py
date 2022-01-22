@@ -8,6 +8,8 @@ from etcd3gw.client import Etcd3Client
 
 from service.models import Project, ProjectInput, ProjectCore
 from service.models import ScenarioCore, ScenarioInput, Scenario
+from service.models import ReservationCore, ReservationInput, Reservation
+from service.models import Lease
 
 
 class StorageException(Exception):
@@ -35,11 +37,23 @@ class ScenarioNameNotFound(StorageException):
         self.scenario_name = scenario_name
 
 
+class ReservationNameNotFound(StorageException):
+    def __init__(self, reservation_name):
+        StorageException.__init__(
+            self, status_code=404,
+            status_message=f'Reservation {reservation_name} not found'
+        )
+        self.reservation_name = reservation_name
+
+
 class Storage:
     def save_data(self):
         pass
 
     def load_data(self):
+        pass
+
+    def get_reservation(self, name, core=False):
         pass
 
 
@@ -235,6 +249,60 @@ class etcdStorage(Storage):
 
         return scenarios
 
+    def get_reservation_list(self) -> List[str]:
+        # Fetch all reservation keys from etcd
+        results = self.storage_service.get_prefix('/reservations/project/')
+
+        reservations = [
+            d["key"].decode("utf-8").split('/')[-1]
+            for v, d in results
+        ]
+
+        return reservations
+
+    def get_reservation(self, name: str, core: bool = False):
+        value = self.storage_service.get(f'/reservation/project/{name}')
+
+        if not value:
+            raise ReservationNameNotFound(name)
+
+        data = json.loads(value[0])
+
+        if core:
+            reservation = ReservationCore(
+                project=name, email=data["email"]
+            )
+        else:
+            reservation = Reservation(
+                project=name, email=data["email"],
+                id=int(data["id"]), ttl=int(data["ttl"])
+            )
+
+        return reservation
+
+    def create_lease(self, duration: int):
+        result = self.storage_service.lease(ttl=duration)
+
+        return Lease(
+            ttl=duration, id=result.id
+        )
+
+    def set_reservation(self, project: str, email: str, duration: int):
+        lease: Lease = self.create_lease(duration)
+
+        data = {
+            "email": email,
+            "id": lease.id,
+            "ttl": lease.ttl
+        }
+
+        self.storage_service.put(
+            key=f'/reservation/project/{project}',
+            value=json.dumps(data)
+        )
+
+        return self.get_reservation(project)
+
 
 class StorageService:
     def __init__(self, svc=etcdStorage()):
@@ -342,4 +410,60 @@ class StorageService:
 
         return return_scenarios
 
-    pass
+    def create_reservation(self, reservation: ReservationInput):
+        """
+        - Need to determine if an existing reservation exists, if so. Fail.
+        - Creating a reservation requires:
+          - Creating a Lease
+          - Creating a Reservation entry with Lease info
+        """
+
+        # Assignment solely for PEP8
+        project = reservation.project
+
+        # Are we creating a duplicate?
+        try:
+            self._svc.get_reservation(project)
+        except ReservationNameNotFound:
+            # This is okay for creating a reservation
+            pass
+        else:
+            # This is not okay as it already exists
+            raise StorageException(
+                    status_code=409,
+                    status_message=f'Reservation for {project} exists'
+            )
+
+        # Create reservation bound to lease
+        result_reservation: Reservation = self._svc.set_reservation(
+            project=project,
+            email=reservation.email, duration=reservation.duration
+        )
+
+        self._svc.save_data()
+
+        return result_reservation
+
+    def fetch_reservation(self, name: str = None):
+        """
+        Dual purpose method
+            - full detail result for specified project name
+            - list of reservation summaries for unspecified project name
+        """
+
+        # Easy part - specific reservation request
+        if name:
+            # No error handling here as we want to pass them all back
+            result: Reservation = self._svc.get_reservation(name)
+            return result
+
+        # Longer part - list of summaries
+        reservation_list: List[str] = self._svc.get_reservation_list()
+
+        return_reservations: List[ReservationCore] = []
+        for reservation in reservation_list:
+            return_reservations.append(
+                self._svc.get_reservation(reservation, core=True)
+            )
+
+        return return_reservations
