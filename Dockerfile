@@ -9,6 +9,13 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
+# Select which storage service to use
+ENV CONDUCTOR_STORAGE_TYPE="ETCD"
+
+# For service based storage, specify hostname and port
+ENV CONDUCTOR_STORAGE_HOST="localhost"
+ENV CONDUCTOR_STORAGE_PORT="2379"
+
 # Install pip requirements
 COPY requirements.txt .
 RUN python -m pip install -r requirements.txt

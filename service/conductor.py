@@ -4,10 +4,13 @@ TODO: Reduce class duplication via https://fastapi.tiangolo.com/tutorial/extra-m
 
 """
 
+import os
+
 from typing import List
 from fastapi import FastAPI, HTTPException
 
-from service.storage import StorageService, StorageException
+from service.storage import StorageService, LocalStorage, EtcdStorage
+from service.storage import StorageException
 
 from service.models import Version
 from service.models import ProjectCore, ProjectInput, Project
@@ -16,13 +19,36 @@ from service.models import ReservationCore, ReservationInput, Reservation
 
 
 # Entry point for gunicorn (Dockerfile)
+def select_storage():
+    storage_type = os.environ.get("CONDUCTOR_STORAGE_TYPE", "ETCD")
+
+    if storage_type == "LOCAL":
+        print('Conductor using local storage')
+        return StorageService(svc=LocalStorage())
+
+    if storage_type == "ETCD":
+        storage_host = os.environ.get('CONDUCTOR_STORAGE_HOST', 'localhost')
+        storage_port = int(os.environ.get('CONDUCTOR_STORAGE_PORT', '2379'))
+
+        etcd_storage = EtcdStorage(
+            etcd_service=storage_host, etcd_port=storage_port
+        )
+
+        # Test connectivity here (add when I add lease support)
+
+        print(f'Conductor using etcd: {storage_host}:{storage_port}')
+        return StorageService(svc=etcd_storage)
+
+    raise Exception('ETCD and LOCAL are only supported storage types')
+
+
 def application():
     global storage_service
     global api
     global app_version
 
     api = FastAPI()
-    storage_service = StorageService()
+    storage_service = select_storage()
     app_version = Version(version='0.2.0')
 
     return api
