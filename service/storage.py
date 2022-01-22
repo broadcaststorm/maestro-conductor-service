@@ -505,7 +505,7 @@ class StorageService:
         result: Reservation = self._svc.get_reservation(project)
 
         # Only the owner can revoke it.
-        if Reservation.email != email.email:
+        if result.email != email.email:
             raise ReservationPermissionDenied(
                 email.email, Reservation.email
             )
