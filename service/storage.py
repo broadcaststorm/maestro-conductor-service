@@ -326,7 +326,8 @@ class EtcdStorage(Storage):
 
         self.storage_service.put(
             key=f'/reservation/project/{project}',
-            value=json.dumps(data)
+            value=json.dumps(data),
+            lease=Etcd3Lease(lease.id, self.storage_service)
         )
 
         return self.get_reservation(project)
