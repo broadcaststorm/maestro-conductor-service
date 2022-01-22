@@ -57,7 +57,7 @@ def create_project(project: ProjectInput):
     # FastAPI will return 422? if there's data validation issues
 
     try:
-        project = storage_service.create_project(project)
+        result = storage_service.create_project(project)
     except StorageException as err:
         raise HTTPException(
             status_code=err.status_code,
@@ -67,7 +67,7 @@ def create_project(project: ProjectInput):
         print(err)
         raise HTTPException(status_code=400, detail='Generic failure')
 
-    return project
+    return result
 
 
 @api.get('/project/{name}', response_model=Project)
@@ -106,7 +106,7 @@ def get_all_scenarios():
 @api.post('/scenario/', response_model=Scenario)
 def create_scenario(scenario: ScenarioInput):
     try:
-        scenario: Scenario = storage_service.create_scenario(scenario)
+        result: Scenario = storage_service.create_scenario(scenario)
     except StorageException as err:
         raise HTTPException(
             status_code=err.status_code,
@@ -116,7 +116,7 @@ def create_scenario(scenario: ScenarioInput):
         print(err)
         raise HTTPException(status_code=400, detail='Generic failure')
 
-    return scenario
+    return result
 
 
 @api.get('/scenario/{name}', response_model=Scenario)
