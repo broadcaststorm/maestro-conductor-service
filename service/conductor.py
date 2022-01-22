@@ -35,6 +35,7 @@ def select_storage():
         )
 
         # Test connectivity here (add when I add lease support)
+        etcd_storage.create_lease(10)
 
         print(f'Conductor using etcd: {storage_host}:{storage_port}')
         return StorageService(svc=etcd_storage)
