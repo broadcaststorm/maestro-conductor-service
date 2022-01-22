@@ -196,7 +196,7 @@ def get_all_reservations():
     return summaries
 
 
-@api.get('/reserve/project/{project}', response_model=Reservation)
+@api.get('/reserve/project/{name}', response_model=Reservation)
 def get_reservation(name: str):
     try:
         reservation: Reservation = storage_service.fetch_reservation(name)

@@ -5,6 +5,7 @@ import json
 from typing import List
 
 from etcd3gw.client import Etcd3Client
+from etcd3gw.lease import Lease as Etcd3Lease
 
 from service.models import Project, ProjectInput, ProjectCore
 from service.models import ScenarioCore, ScenarioInput, Scenario
@@ -251,7 +252,7 @@ class EtcdStorage(Storage):
 
     def get_reservation_list(self) -> List[str]:
         # Fetch all reservation keys from etcd
-        results = self.storage_service.get_prefix('/reservations/project/')
+        results = self.storage_service.get_prefix('/reservation/project/')
 
         reservations = [
             d["key"].decode("utf-8").split('/')[-1]
@@ -261,6 +262,11 @@ class EtcdStorage(Storage):
         return reservations
 
     def get_reservation(self, name: str, core: bool = False):
+        """
+        The returned TTL value is the time remaining on the reservation (calc).
+        The storage service also retains the original requested duration.
+        """
+
         value = self.storage_service.get(f'/reservation/project/{name}')
 
         if not value:
@@ -273,9 +279,12 @@ class EtcdStorage(Storage):
                 project=name, email=data["email"]
             )
         else:
+            lease = Etcd3Lease(int(data["id"]), client=self.storage_service)
+            remaining = lease.ttl()
+
             reservation = Reservation(
                 project=name, email=data["email"],
-                id=int(data["id"]), ttl=int(data["ttl"])
+                id=int(data["id"]), ttl=remaining
             )
 
         return reservation
