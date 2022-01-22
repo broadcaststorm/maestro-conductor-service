@@ -10,6 +10,7 @@ from etcd3gw.lease import Lease as Etcd3Lease
 from service.models import Project, ProjectInput, ProjectCore
 from service.models import ScenarioCore, ScenarioInput, Scenario
 from service.models import ReservationCore, ReservationInput, Reservation
+from service.models import ReservationEmail
 from service.models import Lease
 
 
@@ -45,6 +46,16 @@ class ReservationNameNotFound(StorageException):
             status_message=f'Reservation {reservation_name} not found'
         )
         self.reservation_name = reservation_name
+
+
+class ReservationPermissionDenied(StorageException):
+    def __init__(self, requester, owner):
+        StorageException.__init__(
+            self, status_code=401,
+            status_message=f'You ({requester}) are not the owner ({owner}).'
+        )
+        self.requester = requester
+        self.owner = owner
 
 
 class Storage:
@@ -289,12 +300,20 @@ class EtcdStorage(Storage):
 
         return reservation
 
-    def create_lease(self, duration: int):
+    def create_lease(self, duration: int) -> Lease:
         result = self.storage_service.lease(ttl=duration)
 
         return Lease(
             ttl=duration, id=result.id
         )
+
+    def revoke_lease(self, id: int) -> bool:
+        lease = Etcd3Lease(id, client=self.storage_service)
+
+        if not lease.revoke():
+            raise StorageException('Lease revocation failed')
+
+        return True
 
     def set_reservation(self, project: str, email: str, duration: int):
         lease: Lease = self.create_lease(duration)
@@ -476,3 +495,18 @@ class StorageService:
             )
 
         return return_reservations
+
+    def delete_reservation(
+        self, project: str, email: ReservationEmail
+    ) -> bool:
+
+        # Does the reservation exist?  If not, exception passed back up.
+        result: Reservation = self._svc.get_reservation(project)
+
+        # Only the owner can revoke it.
+        if Reservation.email != email.email:
+            raise ReservationPermissionDenied(
+                email.email, Reservation.email
+            )
+        # Delete it by revoking the lease. Exception passed back up if fails
+        return self._svc.revoke_lease(result.id)

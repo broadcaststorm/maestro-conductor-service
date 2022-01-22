@@ -16,6 +16,7 @@ from service.models import Version
 from service.models import ProjectCore, ProjectInput, Project
 from service.models import ScenarioCore, ScenarioInput, Scenario
 from service.models import ReservationCore, ReservationInput, Reservation
+from service.models import ReservationEmail
 
 
 # Entry point for gunicorn (Dockerfile)
@@ -210,3 +211,17 @@ def get_reservation(name: str):
         raise HTTPException(status_code=400, detail='Generic failure')
 
     return reservation
+
+
+@api.delete('/reserve/project/{name}')
+def delete_reservation(name: str, email: ReservationEmail):
+    try:
+        return storage_service.delete_reservation(name, email)
+    except StorageException as err:
+        raise HTTPException(
+            status_code=err.status_code,
+            detail=err.status_message
+        )
+    except Exception as err:
+        print(err)
+        raise HTTPException(status_code=400, detail='Generic failure')

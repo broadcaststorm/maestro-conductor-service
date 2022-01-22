@@ -79,9 +79,16 @@ class Lease(LeaseRequest):
     id: int
 
 
-class ReservationCore(BaseModel):
-    project: str
+class ReservationEmail(BaseModel):
     email: EmailStr
+
+
+class ReservationProject(BaseModel):
+    project: str
+
+
+class ReservationCore(ReservationEmail, ReservationProject):
+    pass
 
 
 class Reservation(ReservationCore, Lease):
