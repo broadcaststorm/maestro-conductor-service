@@ -50,10 +50,8 @@ class ReservationNameNotFound(StorageException):
 
 class ReservationPermissionDenied(StorageException):
     def __init__(self, requester, owner):
-        StorageException.__init__(
-            self, status_code=401,
-            status_message=f'You ({requester}) are not the owner ({owner}).'
-        )
+        self.status_code = 401
+        self.status_message = f'You ({requester}) are not the owner ({owner}).'
         self.requester = requester
         self.owner = owner
 
@@ -507,7 +505,7 @@ class StorageService:
         # Only the owner can revoke it.
         if result.email != email.email:
             raise ReservationPermissionDenied(
-                email.email, Reservation.email
+                email.email, result.email
             )
         # Delete it by revoking the lease. Exception passed back up if fails
         return self._svc.revoke_lease(result.id)

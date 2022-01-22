@@ -10,7 +10,7 @@ from typing import List
 from fastapi import FastAPI, HTTPException
 
 from service.storage import StorageService, LocalStorage, EtcdStorage
-from service.storage import StorageException
+from service.storage import StorageException, ReservationPermissionDenied
 
 from service.models import Version
 from service.models import ProjectCore, ProjectInput, Project
@@ -217,6 +217,12 @@ def get_reservation(name: str):
 def delete_reservation(name: str, email: ReservationEmail):
     try:
         return storage_service.delete_reservation(name, email)
+    except ReservationPermissionDenied as err:
+        print(err.status_message)
+        raise HTTPException(
+            status_code=err.status_code,
+            detail=err.status_message
+        )
     except StorageException as err:
         raise HTTPException(
             status_code=err.status_code,
