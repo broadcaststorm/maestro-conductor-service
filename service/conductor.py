@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-TODO: Reduce class duplication via https://fastapi.tiangolo.com/tutorial/extra-models/
 
-"""
 
 import os
 
@@ -51,7 +48,7 @@ def application():
 
     api = FastAPI()
     storage_service = select_storage()
-    app_version = Version(version='0.2.0')
+    app_version = Version(version='0.2.1')
 
     return api
 
