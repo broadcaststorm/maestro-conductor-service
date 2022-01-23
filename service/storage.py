@@ -5,9 +5,13 @@ import json
 from typing import List
 
 from etcd3gw.client import Etcd3Client
+from etcd3gw.lease import Lease as Etcd3Lease
 
 from service.models import Project, ProjectInput, ProjectCore
 from service.models import ScenarioCore, ScenarioInput, Scenario
+from service.models import ReservationCore, ReservationInput, Reservation
+from service.models import ReservationEmail
+from service.models import Lease
 
 
 class StorageException(Exception):
@@ -35,11 +39,31 @@ class ScenarioNameNotFound(StorageException):
         self.scenario_name = scenario_name
 
 
+class ReservationNameNotFound(StorageException):
+    def __init__(self, reservation_name):
+        StorageException.__init__(
+            self, status_code=404,
+            status_message=f'Reservation {reservation_name} not found'
+        )
+        self.reservation_name = reservation_name
+
+
+class ReservationPermissionDenied(StorageException):
+    def __init__(self, requester, owner):
+        self.status_code = 401
+        self.status_message = f'You ({requester}) are not the owner ({owner}).'
+        self.requester = requester
+        self.owner = owner
+
+
 class Storage:
     def save_data(self):
         pass
 
     def load_data(self):
+        pass
+
+    def get_reservation(self, name, core=False):
         pass
 
 
@@ -235,6 +259,77 @@ class EtcdStorage(Storage):
 
         return scenarios
 
+    def get_reservation_list(self) -> List[str]:
+        # Fetch all reservation keys from etcd
+        results = self.storage_service.get_prefix('/reservation/project/')
+
+        reservations = [
+            d["key"].decode("utf-8").split('/')[-1]
+            for v, d in results
+        ]
+
+        return reservations
+
+    def get_reservation(self, name: str, core: bool = False):
+        """
+        The returned TTL value is the time remaining on the reservation (calc).
+        The storage service also retains the original requested duration.
+        """
+
+        value = self.storage_service.get(f'/reservation/project/{name}')
+
+        if not value:
+            raise ReservationNameNotFound(name)
+
+        data = json.loads(value[0])
+
+        if core:
+            reservation = ReservationCore(
+                project=name, email=data["email"]
+            )
+        else:
+            lease = Etcd3Lease(int(data["id"]), client=self.storage_service)
+            remaining = lease.ttl()
+
+            reservation = Reservation(
+                project=name, email=data["email"],
+                id=int(data["id"]), ttl=remaining
+            )
+
+        return reservation
+
+    def create_lease(self, duration: int) -> Lease:
+        result = self.storage_service.lease(ttl=duration)
+
+        return Lease(
+            ttl=duration, id=result.id
+        )
+
+    def revoke_lease(self, id: int) -> bool:
+        lease = Etcd3Lease(id, client=self.storage_service)
+
+        if not lease.revoke():
+            raise StorageException('Lease revocation failed')
+
+        return True
+
+    def set_reservation(self, project: str, email: str, duration: int):
+        lease: Lease = self.create_lease(duration)
+
+        data = {
+            "email": email,
+            "id": lease.id,
+            "ttl": lease.ttl
+        }
+
+        self.storage_service.put(
+            key=f'/reservation/project/{project}',
+            value=json.dumps(data),
+            lease=Etcd3Lease(lease.id, self.storage_service)
+        )
+
+        return self.get_reservation(project)
+
 
 class StorageService:
     def __init__(self, svc=EtcdStorage()):
@@ -342,4 +437,75 @@ class StorageService:
 
         return return_scenarios
 
-    pass
+    def create_reservation(self, reservation: ReservationInput):
+        """
+        - Need to determine if an existing reservation exists, if so. Fail.
+        - Creating a reservation requires:
+          - Creating a Lease
+          - Creating a Reservation entry with Lease info
+        """
+
+        # Assignment solely for PEP8
+        project = reservation.project
+
+        # Are we creating a duplicate?
+        try:
+            self._svc.get_reservation(project)
+        except ReservationNameNotFound:
+            # This is okay for creating a reservation
+            pass
+        else:
+            # This is not okay as it already exists
+            raise StorageException(
+                    status_code=409,
+                    status_message=f'Reservation for {project} exists'
+            )
+
+        # Create reservation bound to lease
+        result_reservation: Reservation = self._svc.set_reservation(
+            project=project,
+            email=reservation.email, duration=reservation.duration
+        )
+
+        self._svc.save_data()
+
+        return result_reservation
+
+    def fetch_reservation(self, name: str = None):
+        """
+        Dual purpose method
+            - full detail result for specified project name
+            - list of reservation summaries for unspecified project name
+        """
+
+        # Easy part - specific reservation request
+        if name:
+            # No error handling here as we want to pass them all back
+            result: Reservation = self._svc.get_reservation(name)
+            return result
+
+        # Longer part - list of summaries
+        reservation_list: List[str] = self._svc.get_reservation_list()
+
+        return_reservations: List[ReservationCore] = []
+        for reservation in reservation_list:
+            return_reservations.append(
+                self._svc.get_reservation(reservation, core=True)
+            )
+
+        return return_reservations
+
+    def delete_reservation(
+        self, project: str, email: ReservationEmail
+    ) -> bool:
+
+        # Does the reservation exist?  If not, exception passed back up.
+        result: Reservation = self._svc.get_reservation(project)
+
+        # Only the owner can revoke it.
+        if result.email != email.email:
+            raise ReservationPermissionDenied(
+                email.email, result.email
+            )
+        # Delete it by revoking the lease. Exception passed back up if fails
+        return self._svc.revoke_lease(result.id)
